@@ -49,7 +49,7 @@ class LogMD:
     @staticmethod
     def upload_worker_process(upload_queue: Queue, status_queue: Queue):
         """Worker process that handles uploads"""
-        client = httpx.Client()  
+        client = httpx.Client(timeout=180)  
         
         while True:
             item = upload_queue.get()  
