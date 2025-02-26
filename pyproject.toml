@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logmd"
+version = "0.1"
+authors = [
+  { name="Alexander Mathiasen", email="alexander.mathiasen@gmail.com" },
+]
+description = "Log MD trajectories with `dyn.attach(LogMd()(atoms))."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = { text = "MIT" }
+dependencies = [
+    "ase",
+    "httpx",
+    "tqdm"
+]
+
+[project.scripts]
+logmd = "logmd.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/log-md/logmd"

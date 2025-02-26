@@ -6,9 +6,10 @@ import hashlib
 import atexit
 from io import StringIO
 import ase.io
+import sys
 
 class LogMD:
-    def __init__(self, num_workers=8):
+    def __init__(self, num_workers=3):
         self.frame_num = 0
         
         # Upload using multiple processes
