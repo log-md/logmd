@@ -16,7 +16,7 @@ dyn.run(steps)
 ```
 or
 ```
-logmd 1crn.pdb # also works for trajectories
+$> logmd 1crn.pdb # also works for trajectories
 ```
 Doesn't solve your problem? <a href="https://calendly.com/alexander-mathiasen/vchat">Let us know!</a>
 
