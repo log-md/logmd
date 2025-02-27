@@ -6,12 +6,19 @@ import hashlib
 import atexit
 from io import StringIO
 import ase.io
-import sys
+import numpy as np
+from simtk import unit
+from openmm import app
+from openmm import app
+import ase.io
+from io import StringIO
 
 class LogMD:
-    def __init__(self, num_workers=3):
+    def __init__(self, num_workers=3, template='', interval=100):
         self.frame_num = 0
-        
+        self.interval = interval
+        if template != '': self.template = ase.io.read(template) # for openmm
+
         # Upload using multiple processes
         self.upload_queue = Queue()
         self.status_queue = Queue()
@@ -72,13 +79,24 @@ class LogMD:
         
         client.close()
 
+    # for openmm
+    def describeNextReport(self, simulation):
+        steps = self.interval 
+        return (steps, True, True, True, False)
+    # for openmm
+    def report(self, simulation, state):
+        """ Method openmm calls: simulation.reporters.append(LogMD(template='1crn.pdb', interval=100)). """
+        self.template.positions = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom) 
+        self.__call__(self.template)
+
+    # for ase 
     def __call__(self, atoms):
-        """Method called by dyn.attach(logmd) """
+        """Method ASE calls:  dyn.attach(logmd) """
         self.frame_num += 1
         
         if atoms.calc is not None: energy = float(atoms.get_potential_energy())
         else: energy = 0
-        
+
         temp_pdb = StringIO()
         ase.io.write(temp_pdb, atoms, format='proteindatabank')
         atom_string = temp_pdb.getvalue()

@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='LogMD',
-      version='0.1',
+      version='0.1.2',
       description='Log MD trajectories with `dyn.attach(logmd(atoms)). ',
       url='http://github.com/log-md/logmd',
       author='Alexander Mathiasen',
