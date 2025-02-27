@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "logmd"
-version = "0.1.2"
+version = "0.1.3"
 authors = [
   { name="Alexander Mathiasen", email="alexander.mathiasen@gmail.com" },
 ]
@@ -19,7 +19,8 @@ license = { text = "MIT" }
 dependencies = [
     "ase",
     "httpx",
-    "tqdm"
+    "tqdm",
+    "openmm"
 ]
 
 [project.scripts]

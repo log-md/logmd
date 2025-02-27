@@ -6,10 +6,7 @@ import hashlib
 import atexit
 from io import StringIO
 import ase.io
-import numpy as np
-from simtk import unit
-from openmm import app
-from openmm import app
+from openmm import unit
 import ase.io
 from io import StringIO
 
