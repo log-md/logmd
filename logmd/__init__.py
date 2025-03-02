@@ -13,7 +13,7 @@ import json
 import os 
 import random 
 
-__version__ = '0.1.12'
+__version__ = '0.1.13'
 
 # Linux/Mac/Windows compatible path. 
 token_path = os.path.expanduser("~/.logmd_token")
