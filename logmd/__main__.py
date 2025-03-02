@@ -3,6 +3,7 @@
 from . import *
 import io
 from tqdm import tqdm 
+import sys 
 
 def from_terminal(file_path):
     logmd_obj = LogMD()
@@ -40,6 +41,7 @@ def watch_from_terminal(file_path):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: logmd <file_path> # uploads file")
+        print("Usage: logmd login # log privately ")
         print("Usage: logmd watch <file_path> # uploads file when changed ")
         sys.exit(1)
     
@@ -48,6 +50,8 @@ if __name__ == "__main__":
 
     if command == "watch" and file_path:
         watch_from_terminal(file_path)
+    elif command == "login":
+        LogMD.setup_token() 
     elif file_path:
         from_terminal(file_path)
     else:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "logmd"
-version = "0.1.3"
+version = "0.1.12"
 authors = [
   { name="Alexander Mathiasen", email="alexander.mathiasen@gmail.com" },
 ]
@@ -28,3 +28,6 @@ logmd = "logmd.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/log-md/logmd"
+
+[tool.setuptools]
+packages = ["logmd"]
