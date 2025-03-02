@@ -11,7 +11,7 @@ pip install logmd
 ```
 Try with [demo.py](https://github.com/log-md/logmd/blob/main/demo.py), [this colab](https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM) or from terminal `>logmd 1crn.pdb`. 
 
-We currently only support [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) - [vote here](https://github.com/log-md/logmd/issues/1) for other backends 
+We currently support [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) and [OpenMM](https://github.com/openmm/openmm) - [vote here](https://github.com/log-md/logmd/issues/1) for other backends 
 
 Doesn't solve your problem? <a href="https://calendly.com/alexander-mathiasen/vchat">Let us know!</a> Like it? Buy us a <a href="https://studio.buymeacoffee.com/auth/oauth_callback?is_signup=" target="_blank">coffee!</a>
 
