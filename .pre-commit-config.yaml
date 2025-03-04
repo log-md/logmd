@@ -1,0 +1,28 @@
+repos:
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.4
+    hooks:
+      - id: codespell
+        args: ["--toml, ./pyproject.toml"]
+  # - repo: https://github.com/srstevenson/nb-clean
+  #   rev: 4.0.1
+  #   hooks:
+  #     - id: nb-clean
+  - repo: local
+    hooks:
+      - id: ruff-fmt
+        name: ruff-fmt
+        entry: poetry run ruff format --config=pyproject.toml .
+        types_or: [python, pyi]
+        language: system
+        pass_filenames: false
+
+      - id: ruff-check
+        name: ruff-check
+        entry: poetry run ruff check --config=pyproject.toml --fix .
+        types_or: [python, pyi]
+        language: system
+        pass_filenames: false
+
+default_stages: [pre-push]
+default_install_hook_types: [pre-push]
