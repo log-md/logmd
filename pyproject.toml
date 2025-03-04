@@ -1,30 +1,35 @@
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "logmd"
 version = "0.1.15"
 description = "Log MD trajectories with `dyn.attach(LogMd()(atoms))."
+authors = ["logmd team"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-]
-license = { text = "MIT" }
-dependencies = [
-    "ase",
-    "httpx",
-    "tqdm",
-    "openmm"
-]
 
-[project.scripts]
-logmd = "logmd.__main__:main"
+[tool.poetry.dependencies]
+python = "^3.9"
+ase = "^3.24.0"
+httpx = "^0.28.1"
+tqdm = "^4.67.1"
+openmm = "^8.2.0"
+typer = "^0.15.2"
+pydantic = "^2.10.6"
 
-[project.urls]
-Homepage = "https://github.com/log-md/logmd"
 
-[tool.setuptools]
-packages = ["logmd"]
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.9.9"
+
+[tool.poetry.scripts]
+logmd = "logmd.cli.main:app"
+
+[tool.ruff]
+exclude = ["demos"]
+
+[tool.codespell]
+builtin = "clear,rare,informal,usage,code,names"
+ignore-words-list = "adn,master,uint,wrod"
+skip="*.pdb,logmd/constants.py,poetry.lock"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
