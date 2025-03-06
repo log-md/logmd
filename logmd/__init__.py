@@ -13,12 +13,15 @@ import json
 import os 
 import random 
 
-__version__ = '0.1.13'
+__version__ = '0.1.14'
 
 # Linux/Mac/Windows compatible path. 
 token_path = os.path.expanduser("~/.logmd_token")
-dev = False 
+dev = False
 base_url = 'https://rcsb.ai' if not dev else 'http://localhost:5173'
+
+# Conversion constants. 
+eV_to_K = 11604.5250061657
 
 class LogMD:
     def __init__(self, num_workers=3, project='', template='', interval=100):
@@ -117,7 +120,7 @@ class LogMD:
         while True:
             item = upload_queue.get()  
             if item is None:  break
-            atom_string, frame_num, run_id, energy = item
+            atom_string, frame_num, run_id, data_dict= item
 
             if dev: url = "https://alexander-mathiasen--logmd-upload-frame-dev.modal.run"
             else: url = "https://alexander-mathiasen--logmd-upload-frame.modal.run"
@@ -125,11 +128,11 @@ class LogMD:
             data = {
                 "user_id": "public" if token is None else token['email'],
                 "run_id": run_id,
-                "frame_num": frame_num,
-                "energy": str(energy),
+                "frame_num": str(frame_num),
                 "file_contents": atom_string,
                 "token": None if token is None else token['token'] ,
-                "project": project 
+                "project": project,
+                "data_dict": data_dict,  
             }
 
             response = client.post(url, json=data)
@@ -148,19 +151,25 @@ class LogMD:
         self.__call__(self.template)
 
     # for ase 
-    def __call__(self, atoms):
+    def __call__(self, atoms, dyn, data_dict={}):
         """Method ASE calls:  dyn.attach(logmd) """
         self.frame_num += 1
         
         if atoms.calc is not None: energy = float(atoms.get_potential_energy())
         else: energy = 0
 
+        simulation_time, temperature = dyn.get_time(), dyn.temp*eV_to_K
+
         temp_pdb = StringIO()
         ase.io.write(temp_pdb, atoms, format='proteindatabank')
         atom_string = temp_pdb.getvalue()
         temp_pdb.close()
-
-        self.upload_queue.put((atom_string, self.frame_num, self.run_id, energy))
+        data_dict.update({
+            "energy": f"{energy} [eV]",
+            "simulation_time": f"{simulation_time} [ps]",
+            "temperature": f"{temperature} [K]"
+        })
+        self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict))
 
     def num_files(self):
         """Returns the number of files in the current project."""
