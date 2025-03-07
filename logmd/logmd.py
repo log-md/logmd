@@ -123,7 +123,7 @@ class LogMD:
             self.upload_queue.put(None)
         for process in self.upload_processes:
             process.join()
-        rich.print(f"{LOGMD_PREFIX}id=\033[34m{self.url}\033[0m ✅")
+        rich.print(f"{LOGMD_PREFIX}id=[blue]{self.url}[/] ✅")
 
     @staticmethod
     def upload_worker_process(
