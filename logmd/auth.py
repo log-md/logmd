@@ -32,7 +32,9 @@ def load_token() -> LogMDToken | None:
     try:
         token = LogMDToken.model_validate_json(TOKEN_PATH.read_text())
     except Exception:
-        rich.print(f"{LOGMD_PREFIX}[red]token file is corrupted, please login again[/red]")
+        rich.print(
+            f"{LOGMD_PREFIX}[red]token file is corrupted, please login again[/red]"
+        )
         if TOKEN_PATH.is_file():
             TOKEN_PATH.unlink()
 

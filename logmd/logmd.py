@@ -11,10 +11,10 @@ import random
 import rich
 from typing import Optional
 
-from logmd.constants import TOKEN_PATH, LOGMD_PREFIX, eV_to_K
+from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
 from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url
-from logmd.auth import setup_token, load_token
+from logmd.auth import load_token
 
 
 class LogMD:
@@ -103,7 +103,7 @@ class LogMD:
         # Cleanup asynch processes when python exists.
         atexit.register(self.cleanup)
 
-    @property    
+    @property
     def logged_in(self) -> bool:
         return self.token is not None
 
@@ -190,18 +190,20 @@ class LogMD:
         else:
             energy = 0
 
-        simulation_time, temperature = dyn.get_time(), dyn.temp*eV_to_K
+        simulation_time, temperature = dyn.get_time(), dyn.temp * eV_to_K
 
         temp_pdb = StringIO()
         ase.io.write(temp_pdb, atoms, format="proteindatabank")
         atom_string = temp_pdb.getvalue()
         temp_pdb.close()
 
-        data_dict.update({
-            "energy": f"{energy} [eV]",
-            "simulation_time": f"{simulation_time} [ps]",
-            "temperature": f"{temperature} [K]"
-        })
+        data_dict.update(
+            {
+                "energy": f"{energy} [eV]",
+                "simulation_time": f"{simulation_time} [ps]",
+                "temperature": f"{temperature} [K]",
+            }
+        )
         self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict))
 
     def num_files(self) -> int:
