@@ -13,12 +13,12 @@ def setup_token() -> None:
     rich.print(
         f"{LOGMD_PREFIX}[white]Login here: [cyan]{get_fe_base_url()}/auth[/cyan]"
     )
-    token = Prompt.ask(f"{LOGMD_PREFIX} [white]Enter your token[/white]")
+    token = Prompt.ask(f"{LOGMD_PREFIX}[white]Enter your token[/white]")
 
     try:
         token_obj = LogMDToken.model_validate_json(token)
     except ValidationError:
-        rich.print(f"{LOGMD_PREFIX} [red]Invalid token[/red]")
+        rich.print(f"{LOGMD_PREFIX}[red]Invalid token[/red]")
         raise typer.Abort()
 
     TOKEN_PATH.write_text(token_obj.model_dump_json())
