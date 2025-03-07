@@ -1,7 +1,7 @@
 <a href="https://rcsb.ai/logmd/3d090180" target="_blank"><img src='demo.gif'></a>
 
 # LogMD: View/Share MD While It Runs 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM)
+ <a href="https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
 
 <a href='https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM' target='_blank'>
 
@@ -18,11 +18,11 @@ Try with
 
  * [ase_demo.py](https://github.com/log-md/logmd/blob/main/demos/ase_demo.py)
  * [openmm_demo.py](https://github.com/log-md/logmd/blob/main/demos/openmm_demo.py)
- * [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM)
- * From terminal 
+ * <a href="https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
+ * From terminal:
 
  ```shell
- $ logmd 1crn.pdb`.
+ logmd 1crn.pdb`.
  ```
 
 We currently support [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) and [OpenMM](https://github.com/openmm/openmm) 
