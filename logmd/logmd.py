@@ -6,7 +6,7 @@ import hashlib
 import atexit
 from io import StringIO
 import ase.io
-from openmm import unit
+from openmm import unit  # type: ignore[import-untyped]
 import random
 import rich
 from typing import Optional
@@ -54,7 +54,11 @@ class LogMD:
         self.token: Optional[LogMDToken] = None
 
         if template != "":
-            self.template = ase.io.read(template)  # for openmm
+            template_or_templates = ase.io.read(template)  # for openmm
+            if isinstance(template_or_templates, list):
+                self.template = template_or_templates[0]
+            else:
+                self.template = template_or_templates
 
         # if no project => log publicly, no need to log-in.
         if self.project != "":
@@ -174,7 +178,7 @@ class LogMD:
         self.__call__(self.template)
 
     # for ase
-    def __call__(self, atoms, dyn, data_dict=None):
+    def __call__(self, atoms, dyn=None, data_dict=None):
         """
         Method ASE calls:
         logmd = LogMD()
@@ -190,7 +194,14 @@ class LogMD:
         else:
             energy = 0
 
-        simulation_time, temperature = dyn.get_time(), dyn.temp * eV_to_K
+        if dyn is not None:
+            simulation_time, temperature = dyn.get_time(), dyn.temp * eV_to_K
+            data_dict.update(
+                {
+                    "simulation_time": f"{simulation_time} [ps]",
+                    "temperature": f"{temperature} [K]",
+                }
+            )
 
         temp_pdb = StringIO()
         ase.io.write(temp_pdb, atoms, format="proteindatabank")
@@ -200,8 +211,6 @@ class LogMD:
         data_dict.update(
             {
                 "energy": f"{energy} [eV]",
-                "simulation_time": f"{simulation_time} [ps]",
-                "temperature": f"{temperature} [K]",
             }
         )
         self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict))
@@ -218,6 +227,10 @@ class LogMD:
             url = "https://alexander-mathiasen--logmd-list-project-dev.modal.run"  # Replace with the actual URL
         else:
             url = "https://alexander-mathiasen--logmd-list-project.modal.run"  # Replace with the actual URL
+
+        assert self.token is not None, (
+            "Should not happen. self.logged_in === self.token is not None"
+        )
         data = {
             "user_id": self.token.email,
             "token": self.token.token,

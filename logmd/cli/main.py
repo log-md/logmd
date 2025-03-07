@@ -16,11 +16,14 @@ app.add_typer(auth_app, name="")
 @app.command(name="upload")
 def upload_file(
     file_path: Path = typer.Argument(help="The path to the file to upload."),
+    project: str = typer.Option(
+        default="", help="The project to upload to [requires login]."
+    ),
 ):
     """
     Upload a file to LogMD.
     """
-    logmd_obj = LogMD()
+    logmd_obj = LogMD(project=project)
     content = file_path.read_text()
     model_count = content.count("MODEL")
 
@@ -28,7 +31,7 @@ def upload_file(
         atoms = ase.io.read(file_path)
         logmd_obj(atoms)
     else:
-        models = content.split("MODEL")
+        models = content.split("\nMODEL")
         for model in tqdm(
             models[1:]
         ):  # Skip the first split part as it is before the first MODEL

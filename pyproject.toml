@@ -2,7 +2,10 @@
 name = "logmd"
 version = "0.1.15"
 description = "Log MD trajectories with `dyn.attach(LogMd()(atoms))."
-authors = ["logmd team"]
+authors = [
+  "Alexander Mathiasen <alexander.mathiasen@gmail.com>",
+  "Frederik Hvilshoj <fhvilshoj@gmail.com>",
+]
 license = "MIT"
 readme = "README.md"
 
@@ -18,6 +21,8 @@ pydantic = "^2.10.6"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.9.9"
+mypy = "^1.15.0"
+types-tqdm = "^4.67.0.20250301"
 
 [tool.poetry.scripts]
 logmd = "logmd.cli.main:app"
