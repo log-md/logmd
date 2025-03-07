@@ -4,10 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "logmd"
-version = "0.1.14"
-authors = [
-  { name="Alexander Mathiasen", email="alexander.mathiasen@gmail.com" },
-]
+version = "0.1.15"
 description = "Log MD trajectories with `dyn.attach(LogMd()(atoms))."
 readme = "README.md"
 requires-python = ">=3.8"

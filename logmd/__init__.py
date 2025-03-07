@@ -13,7 +13,7 @@ import json
 import os 
 import random 
 
-__version__ = '0.1.14'
+__version__ = '0.1.15'
 
 # Linux/Mac/Windows compatible path. 
 token_path = os.path.expanduser("~/.logmd_token")
@@ -151,24 +151,26 @@ class LogMD:
         self.__call__(self.template)
 
     # for ase 
-    def __call__(self, atoms, dyn, data_dict={}):
+    def __call__(self, atoms, dyn=None, data_dict={}):
         """Method ASE calls:  dyn.attach(logmd) """
         self.frame_num += 1
         
         if atoms.calc is not None: energy = float(atoms.get_potential_energy())
         else: energy = 0
 
-        simulation_time, temperature = dyn.get_time(), dyn.temp*eV_to_K
-
         temp_pdb = StringIO()
         ase.io.write(temp_pdb, atoms, format='proteindatabank')
         atom_string = temp_pdb.getvalue()
         temp_pdb.close()
         data_dict.update({
-            "energy": f"{energy} [eV]",
-            "simulation_time": f"{simulation_time} [ps]",
-            "temperature": f"{temperature} [K]"
-        })
+            "energy": f"{energy} [eV]",})
+
+        if dyn is not None:
+            data_dict.update({
+                "simulation_time": f"{dyn.get_time()} [ps]",
+                "temperature": f"{dyn.temp*eV_to_K} [K]"
+            })
+
         self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict))
 
     def num_files(self):

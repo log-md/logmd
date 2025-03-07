@@ -14,7 +14,7 @@ def from_terminal(file_path):
         atoms = ase.io.read(file_path)
         logmd_obj(atoms)
     else: 
-        models = content.split('MODEL')
+        models = content.split('\nMODEL')
         for model in tqdm(models[1:]):  # Skip the first split part as it is before the first MODEL
             buffer = io.StringIO('MODEL' + model)
             # Ensure buffer content is a string
