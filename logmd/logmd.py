@@ -174,7 +174,7 @@ class LogMD:
         self.__call__(self.template)
 
     # for ase
-    def __call__(self, atoms, dyn, data_dict: dict[str, Any] = None):
+    def __call__(self, atoms, dyn, data_dict=None):
         """
         Method ASE calls:
         logmd = LogMD()

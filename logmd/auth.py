@@ -11,7 +11,7 @@ from rich.prompt import Prompt
 
 def setup_token() -> None:
     rich.print(
-        f"{LOGMD_PREFIX} [white]Login here: [cyan]{get_fe_base_url()}/auth[/cyan]"
+        f"{LOGMD_PREFIX}[white]Login here: [cyan]{get_fe_base_url()}/auth[/cyan]"
     )
     token = Prompt.ask(f"{LOGMD_PREFIX} [white]Enter your token[/white]")
 
@@ -22,7 +22,7 @@ def setup_token() -> None:
         raise typer.Abort()
 
     TOKEN_PATH.write_text(token_obj.model_dump_json())
-    rich.print(f"{LOGMD_PREFIX} [green]Logged in successfully ✅[/green]")
+    rich.print(f"{LOGMD_PREFIX}[green]Logged in successfully ✅[/green]")
 
 
 def load_token() -> LogMDToken | None:
@@ -30,13 +30,12 @@ def load_token() -> LogMDToken | None:
         setup_token()
 
     try:
-        token = LogMDToken.model_validate_json(TOKEN_PATH.read_text())
+        return LogMDToken.model_validate_json(TOKEN_PATH.read_text())
     except Exception:
         rich.print(
-            f"{LOGMD_PREFIX}[red]token file is corrupted, please login again[/red]"
+            f"{LOGMD_PREFIX}[red]token file seems corrupted, please login again[/red]"
         )
         if TOKEN_PATH.is_file():
             TOKEN_PATH.unlink()
-
         setup_token()
         return load_token()
