@@ -25,5 +25,16 @@ def setup_token() -> None:
     rich.print(f"{LOGMD_PREFIX} [green]Logged in successfully ✅[/green]")
 
 
-def load_token() -> LogMDToken:
-    return LogMDToken.model_validate_json(TOKEN_PATH.read_text())
+def load_token() -> LogMDToken | None:
+    if not TOKEN_PATH.is_file():
+        setup_token()
+
+    try:
+        token = LogMDToken.model_validate_json(TOKEN_PATH.read_text())
+    except Exception:
+        rich.print(f"{LOGMD_PREFIX}[red]token file is corrupted, please login again[/red]")
+        if TOKEN_PATH.is_file():
+            TOKEN_PATH.unlink()
+
+        setup_token()
+        return load_token()

@@ -52,26 +52,13 @@ class LogMD:
         self.interval: int = interval
         self.project: str = project
         self.token: Optional[LogMDToken] = None
-        self.logged_in = False
 
         if template != "":
             self.template = ase.io.read(template)  # for openmm
 
         # if no project => log publicly, no need to log-in.
         if self.project != "":
-            # if no token, try to setup token, then log-in (i.e. load token).
-            if not TOKEN_PATH.is_file():
-                setup_token()
-
-            try:
-                self.token = load_token()
-            except Exception:
-                rich.print(f"{LOGMD_PREFIX}token file is corrupted, please login again")
-                if TOKEN_PATH.is_file():
-                    TOKEN_PATH.unlink()
-
-                setup_token()
-                load_token()
+            self.load_or_create_token()
 
         # Upload using multiple processes
         self.upload_queue = Queue()
@@ -116,6 +103,16 @@ class LogMD:
         # Cleanup asynch processes when python exists.
         atexit.register(self.cleanup)
 
+    @property    
+    def logged_in(self) -> bool:
+        return self.token is not None
+
+    def load_or_create_token(self) -> None:
+        """
+        Load or create a token. This is the analogy of `logmd login` in the CLI.
+        """
+        self.token = load_token()
+
     def cleanup(self) -> None:
         rich.print(
             f"{LOGMD_PREFIX}Finishing uploads (if >5s open issue https://github.com/log-md/logmd)"
@@ -130,7 +127,7 @@ class LogMD:
 
     @staticmethod
     def upload_worker_process(
-        upload_queue: Queue, status_queue: Queue, token: dict, project: str
+        upload_queue: Queue, status_queue: Queue, token: LogMDToken, project: str
     ) -> None:
         """Worker process that handles uploads"""
         client = httpx.Client(timeout=180)
@@ -143,11 +140,11 @@ class LogMD:
 
             url = get_upload_url()
             data = {
-                "user_id": "public" if token is None else token["email"],
+                "user_id": "public" if token is None else token.email,
                 "run_id": run_id,
                 "frame_num": str(frame_num),
                 "file_contents": atom_string,
-                "token": None if token is None else token["token"],
+                "token": None if token is None else token.token,
                 "project": project,
                 "data_dict": data_dict,
             }
