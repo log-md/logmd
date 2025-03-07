@@ -1,3 +1,9 @@
+# Download 1crn.pdb 
+import urllib.request
+pdb_url = "https://files.rcsb.org/download/1crn.pdb"
+urllib.request.urlretrieve(pdb_url, "1crn.pdb")
+
+# Demo with OpenMM
 from openmm.app import *
 from openmm import *
 from openmm.unit import *
