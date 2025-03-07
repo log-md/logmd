@@ -98,7 +98,7 @@ class LogMD:
         # Print init message with run id.
         rich.print(f"{LOGMD_PREFIX}Load_time=[blue]{time.time() - t0:.2f}s[/] 🚀")
         rich.print(f"{LOGMD_PREFIX}Id=[blue]{self.run_id}[/] 🚀")
-        rich.print(f"{LOGMD_PREFIX}Url=[blue]{self.url}[/] 🚀")
+        rich.print(f"{LOGMD_PREFIX}Url=[blue][link={self.url}]{self.url}[/link][/] 🚀")
 
         # Cleanup asynch processes when python exists.
         atexit.register(self.cleanup)
@@ -115,7 +115,7 @@ class LogMD:
 
     def cleanup(self) -> None:
         rich.print(
-            f"{LOGMD_PREFIX}Finishing uploads (if >5s open issue https://github.com/log-md/logmd)"
+            f"{LOGMD_PREFIX}Finishing uploads (if >5s open issue [link=https://github.com/log-md/logmd]https://github.com/log-md/logmd[/link] )"
         )
 
         # Send termination signal to all worker processes
