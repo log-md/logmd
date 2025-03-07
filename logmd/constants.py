@@ -2,6 +2,8 @@ from pathlib import Path
 
 TOKEN_PATH = Path("~/.logmd_token").expanduser().resolve()
 LOGMD_PREFIX = "[dim]\\[[green3]logmd[/][dim]] [dim]"
+eV_to_K = 11604.5250061657
+
 
 # Adjectives/Nouns
 ADJECTIVES = [

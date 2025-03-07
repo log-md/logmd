@@ -11,7 +11,7 @@ import random
 import rich
 from typing import Optional
 
-from logmd.constants import TOKEN_PATH, LOGMD_PREFIX
+from logmd.constants import TOKEN_PATH, LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
 from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url
 from logmd.auth import setup_token, load_token
@@ -139,17 +139,17 @@ class LogMD:
             item = upload_queue.get()
             if item is None:
                 break
-            atom_string, frame_num, run_id, energy = item
+            atom_string, frame_num, run_id, data_dict = item
 
             url = get_upload_url()
             data = {
                 "user_id": "public" if token is None else token["email"],
                 "run_id": run_id,
-                "frame_num": frame_num,
-                "energy": str(energy),
+                "frame_num": str(frame_num),
                 "file_contents": atom_string,
                 "token": None if token is None else token["token"],
                 "project": project,
+                "data_dict": data_dict,
             }
             response = client.post(url, json=data)
             status_queue.put((frame_num, response.status_code))
@@ -177,12 +177,15 @@ class LogMD:
         self.__call__(self.template)
 
     # for ase
-    def __call__(self, atoms):
+    def __call__(self, atoms, dyn, data_dict: dict[str, Any] = None):
         """
         Method ASE calls:
         logmd = LogMD()
         dyn.attach(logmd)
         """
+        if data_dict is None:
+            data_dict = {}
+
         self.frame_num += 1
 
         if atoms.calc is not None:
@@ -190,12 +193,19 @@ class LogMD:
         else:
             energy = 0
 
+        simulation_time, temperature = dyn.get_time(), dyn.temp*eV_to_K
+
         temp_pdb = StringIO()
         ase.io.write(temp_pdb, atoms, format="proteindatabank")
         atom_string = temp_pdb.getvalue()
         temp_pdb.close()
 
-        self.upload_queue.put((atom_string, self.frame_num, self.run_id, energy))
+        data_dict.update({
+            "energy": f"{energy} [eV]",
+            "simulation_time": f"{simulation_time} [ps]",
+            "temperature": f"{temperature} [K]"
+        })
+        self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict))
 
     def num_files(self) -> int:
         """Returns the number of files in the current project."""
