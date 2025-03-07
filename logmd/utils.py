@@ -1,8 +1,6 @@
 import os
 import random
 
-from functools import lru_cache
-
 from logmd.constants import ADJECTIVES, NOUNS
 
 FE_DEV = "http://localhost:5173"
@@ -11,17 +9,14 @@ BE_DEV = "https://alexander-mathiasen--logmd-upload-frame-dev.modal.run"
 BE_PROD = "https://alexander-mathiasen--logmd-upload-frame.modal.run"
 
 
-@lru_cache(maxsize=1)
 def is_dev():
     return os.environ.get("LOGMD_DEV", "false").lower() == "true"
 
 
-@lru_cache(maxsize=1)
 def get_fe_base_url():
     return FE_PROD if not is_dev() else FE_DEV
 
 
-@lru_cache(maxsize=1)
 def get_upload_url():
     return BE_PROD if not is_dev() else BE_DEV
 
