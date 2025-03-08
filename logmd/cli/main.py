@@ -8,10 +8,14 @@ import ase
 import typer
 from logmd import LogMD
 from logmd.cli.auth import auth_app
+import sys 
+
+# Make `logmd file.pdb` work as `logmd upload file.pdb`. 
+if len(sys.argv) > 1 and "." in sys.argv[1] and not sys.argv[1].startswith("-"):
+    sys.argv.insert(1, "upload")
 
 app = Typer(name="logmd", rich_markup_mode="rich")
 app.add_typer(auth_app, name="")
-
 
 @app.command(name="upload")
 def upload_file(
@@ -25,7 +29,7 @@ def upload_file(
     """
     logmd_obj = LogMD(project=project)
     content = file_path.read_text()
-    model_count = content.count("MODEL")
+    model_count = content.count("\nMODEL")
 
     if model_count <= 1:
         atoms = ase.io.read(file_path)

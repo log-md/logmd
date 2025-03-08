@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "logmd"
-version = "0.1.15"
-description = "Log MD trajectories with `dyn.attach(LogMd()(atoms))."
+version = "0.1.20"
+description = "Log MD trajectories. "
 authors = [
   "Alexander Mathiasen <alexander.mathiasen@gmail.com>",
   "Frederik Hvilshoj <fhvilshoj@gmail.com>",

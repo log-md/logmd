@@ -126,7 +126,7 @@ class LogMD:
             self.upload_queue.put(None)
         for process in self.upload_processes:
             process.join()
-        rich.print(f"{LOGMD_PREFIX}id=[blue]{self.url}[/] ✅")
+        rich.print(f"{LOGMD_PREFIX}Url=[blue]{self.url}[/] ✅")
 
     @staticmethod
     def upload_worker_process(
@@ -216,11 +216,7 @@ class LogMD:
 
     def num_files(self) -> int:
         """Returns the number of files in the current project."""
-        if not self.logged_in:
-            rich.print(
-                f"{LOGMD_PREFIX}[red]Not logged in. Cannot list project files.[/]"
-            )
-            return 0
+        if not self.logged_in: return 0
 
         if is_dev():
             url = "https://alexander-mathiasen--logmd-list-project-dev.modal.run"  # Replace with the actual URL
