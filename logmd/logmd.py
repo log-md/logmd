@@ -101,7 +101,6 @@ class LogMD:
 
         # Print init message with run id.
         rich.print(f"{LOGMD_PREFIX}Load_time=[blue]{time.time() - t0:.2f}s[/] 🚀")
-        rich.print(f"{LOGMD_PREFIX}Id=[blue]{self.run_id}[/] 🚀")
         rich.print(f"{LOGMD_PREFIX}Url=[blue][link={self.url}]{self.url}[/link][/] 🚀")
 
         # Cleanup asynch processes when python exists.
