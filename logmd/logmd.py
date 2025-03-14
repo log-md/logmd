@@ -4,12 +4,15 @@ from multiprocessing import Queue
 import time
 import hashlib
 import atexit
-from io import StringIO
+import io 
 import ase.io
 from openmm import unit  # type: ignore[import-untyped]
 import random
 import rich
 from typing import Optional
+import base64
+from tqdm import tqdm
+import zipfile
 
 from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
@@ -176,6 +179,57 @@ class LogMD:
         )
         self.__call__(self.template)
 
+    @staticmethod
+    def mdanalysis(u):
+        """ Example: 
+        ```
+            import MDAnalysis as mda
+            import LogMD
+            u=mda.Universe('topology.pdb', 'samples.xtc')
+            LogMD.mdanalysis(u)
+        ```
+        """
+        url = 'https://alexander-mathiasen--logmd-upload-single-file-dev.modal.run' if is_dev() else 'https://alexander-mathiasen--logmd-upload-single-file.modal.run'
+        
+        atoms = ase.io.read(u.filename)
+        output_buffer = io.StringIO()
+        
+        for frame_idx in tqdm(range(len(u.trajectory)), desc="Processing frames"):
+            u.trajectory[frame_idx]
+            atoms.positions = u.atoms.positions
+            ase.io.write(output_buffer, atoms, format='proteindatabank')
+            
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=5) as zip_file:
+            zip_file.writestr('trajectory_analysis.pdb', output_buffer.getvalue().encode('utf-8'))
+        
+        base64_encoded = base64.b64encode(zip_buffer.getvalue()).decode('ascii')
+        
+        def data_generator():
+            import json
+            json_str = json.dumps({"file_contents": base64_encoded}).encode('utf-8')
+            total_size = len(json_str)
+            chunk_size = min(4096, total_size // 100)
+            
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc="Uploading") as pbar:
+                for i in range(0, total_size, chunk_size):
+                    chunk = json_str[i:i+chunk_size]
+                    pbar.update(len(chunk))
+                    yield chunk
+
+        try:
+            client = httpx.Client(timeout=6000)
+            response = client.post(url, content=data_generator(), headers={"Content-Type": "application/json"})
+            client.close()
+            
+            if response.status_code == 200:
+                url = f"{get_fe_base_url()}/logmd/{response.json().get('run_id', '')}"
+                rich.print(f"{LOGMD_PREFIX}Url=[blue][link={url}]{url}[/link][/] ✅")
+            else:
+                rich.print(f"{LOGMD_PREFIX}[red]Upload failed: {response.status_code} - {response.text}[/]")
+        except Exception as e:
+            rich.print(f"{LOGMD_PREFIX}[red]Error during upload: {str(e)}[/]")
+
     # for ase
     def __call__(self, atoms, dyn=None, data_dict=None):
         """
@@ -202,7 +256,7 @@ class LogMD:
                 }
             )
 
-        temp_pdb = StringIO()
+        temp_pdb = io.StringIO()
         ase.io.write(temp_pdb, atoms, format="proteindatabank")
         atom_string = temp_pdb.getvalue()
         temp_pdb.close()
