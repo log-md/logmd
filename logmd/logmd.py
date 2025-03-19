@@ -86,7 +86,7 @@ class LogMD:
         # If logged-in use <adjective>-<noun>-<num> as name.
         if self.logged_in:
             self.run_id = get_run_id(self.num)
-            self.url = f"{get_fe_base_url()}/logmd/{self.project}/{self.run_id}"
+            self.url = f"{get_fe_base_url()}/{self.project}/{self.run_id}"
         # if not logged in, store publicly, use sha256 hash to remove collision.
         else:
             # pr[collision]~1/16^10=1e-12
@@ -100,7 +100,7 @@ class LogMD:
                 self.run_id = hashlib.sha256(
                     str(time.time() + random.random()).encode()
                 ).hexdigest()[:10]
-            self.url = f"{get_fe_base_url()}/logmd/{self.run_id}"
+            self.url = f"{get_fe_base_url()}/{self.run_id}"
 
         # Print init message with run id.
         rich.print(f"{LOGMD_PREFIX}Load_time=[blue]{time.time() - t0:.2f}s[/] 🚀")
@@ -180,7 +180,7 @@ class LogMD:
         self.__call__(self.template)
 
     @staticmethod
-    def mdanalysis(u):
+    def mdanalysis(u, fun=None, display_notebook=False):
         """ Example: 
         ```
             import MDAnalysis as mda
@@ -193,10 +193,19 @@ class LogMD:
         
         atoms = ase.io.read(u.filename)
         output_buffer = io.StringIO()
-        
+
+
         for frame_idx in tqdm(range(len(u.trajectory)), desc="Processing frames"):
             u.trajectory[frame_idx]
             atoms.positions = u.atoms.positions
+
+            header = ""
+            if fun is not None:
+                data_dict = fun(atoms)
+                for key, value in data_dict.items():
+                    header += f"{key}={value}\n"
+
+            output_buffer.write(header)  # Write header before atoms
             ase.io.write(output_buffer, atoms, format='proteindatabank')
             
         zip_buffer = io.BytesIO()
@@ -223,12 +232,18 @@ class LogMD:
             client.close()
             
             if response.status_code == 200:
-                url = f"{get_fe_base_url()}/logmd/{response.json().get('run_id', '')}"
+                url = f"{get_fe_base_url()}/{response.json().get('run_id', '')}"
                 rich.print(f"{LOGMD_PREFIX}Url=[blue][link={url}]{url}[/link][/] ✅")
             else:
                 rich.print(f"{LOGMD_PREFIX}[red]Upload failed: {response.status_code} - {response.text}[/]")
         except Exception as e:
             rich.print(f"{LOGMD_PREFIX}[red]Error during upload: {str(e)}[/]")
+
+        if display_notebook:
+            from IPython.display import display
+            display(LogMD.display_notebook(url))
+
+        return url
 
     # for ase
     def __call__(self, atoms, dyn=None, data_dict=None):
@@ -306,3 +321,12 @@ class LogMD:
             )
 
         return 0
+
+    def notebook(self, width=1000, height=600):
+        from IPython.display import IFrame
+        return IFrame(f"{self.url}", width=width, height=height)
+
+    @staticmethod
+    def display_notebook(url, width=1000, height=600):
+        from IPython.display import IFrame
+        return IFrame(f"{url}", width=width, height=height)
