@@ -5,6 +5,7 @@ import time
 import hashlib
 import atexit
 import io 
+import os 
 import ase.io
 from openmm import unit  # type: ignore[import-untyped]
 import random
@@ -13,10 +14,11 @@ from typing import Optional
 import base64
 from tqdm import tqdm
 import zipfile
+from ase import units
 
 from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
-from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url
+from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url, update_pdb_positions
 from logmd.auth import load_token
 
 
@@ -27,6 +29,9 @@ class LogMD:
         project: str = "",
         template: str = "",
         interval: int = 100,
+        pdb: str = "",
+        store_locally: bool = False, # store locally 
+        zip: bool = False # zip when done. 
     ):
         """
         LogMD logs ase.Atoms objects to rscb.ai.
@@ -55,6 +60,14 @@ class LogMD:
         self.interval: int = interval
         self.project: str = project
         self.token: Optional[LogMDToken] = None
+        self.pdb = pdb 
+        self.store_locally = store_locally
+        self.zip = zip
+        self.path = os.getcwd()
+        self.disk_space_warning_shown = False  # Track if warning has been shown
+
+        if self.pdb != "":
+            self.pdb = open(self.pdb, 'r').read()
 
         if template != "":
             template_or_templates = ase.io.read(template)  # for openmm
@@ -92,6 +105,9 @@ class LogMD:
             # pr[collision]~1/16^10=1e-12
             # E[draws to get collision]~sqrt(pr[collision])~1e-5    (birthday paradox)
             # => we have to check...
+            # TODO: 
+            #   [ ] move hash generation to backend.
+            #   [ ] move upload to signed url  
             self.run_id = hashlib.sha256(str(time.time()).encode()).hexdigest()[:10]
             while (
                 httpx.head(f"https://logmd.b-cdn.net/public/{self.run_id}/").status_code
@@ -101,6 +117,9 @@ class LogMD:
                     str(time.time() + random.random()).encode()
                 ).hexdigest()[:10]
             self.url = f"{get_fe_base_url()}/{self.run_id}"
+
+        if self.store_locally:
+            os.makedirs(f"{self.path}/logmd/{self.run_id}/", exist_ok=True)
 
         # Print init message with run id.
         rich.print(f"{LOGMD_PREFIX}Load_time=[blue]{time.time() - t0:.2f}s[/] 🚀")
@@ -129,6 +148,12 @@ class LogMD:
             self.upload_queue.put(None)
         for process in self.upload_processes:
             process.join()
+
+        # Zip and upload local files if requested
+        #if self.store_locally and self.zip:
+        #    #self.zip_and_upload_local_files()
+
+
         rich.print(f"{LOGMD_PREFIX}Url=[blue]{self.url}[/] ✅")
 
     @staticmethod
@@ -263,7 +288,7 @@ class LogMD:
             energy = 0
 
         if dyn is not None:
-            simulation_time, temperature = dyn.get_time(), dyn.temp * eV_to_K
+            simulation_time, temperature = dyn.get_time()/units.fs, dyn.temp * eV_to_K
             data_dict.update(
                 {
                     "simulation_time": f"{simulation_time} [ps]",
@@ -271,10 +296,27 @@ class LogMD:
                 }
             )
 
-        temp_pdb = io.StringIO()
-        ase.io.write(temp_pdb, atoms, format="proteindatabank")
-        atom_string = temp_pdb.getvalue()
-        temp_pdb.close()
+        if self.pdb != "":
+            atom_string = update_pdb_positions(self.pdb, atoms.positions)
+        else: 
+            temp_pdb = io.StringIO()
+            ase.io.write(temp_pdb, atoms, format="proteindatabank")
+            atom_string = temp_pdb.getvalue()
+            temp_pdb.close()
+
+
+        if self.store_locally:
+            try: 
+                free_space = os.statvfs(self.path).f_frsize * os.statvfs(self.path).f_bavail
+                if free_space >= 1000000000:  
+                    with open(f"{self.path}/logmd/{self.run_id}/{self.frame_num}.pdb", "w") as f:
+                        f.write(atom_string)
+                else:
+                    if not self.disk_space_warning_shown:
+                        rich.print(f"{LOGMD_PREFIX}[yellow]Warning: Less than 1GB free space available. Skipping local storage.[/]")
+                        self.disk_space_warning_shown = True
+            except: 
+                pass 
 
         data_dict.update(
             {
@@ -322,11 +364,13 @@ class LogMD:
 
         return 0
 
-    def notebook(self, width=1000, height=600):
-        from IPython.display import IFrame
-        return IFrame(f"{self.url}", width=width, height=height)
+    def notebook(self, width=900, height=600):
+        from IPython.display import IFrame, display
+        iframe = IFrame(f"{self.url}", width=width, height=height)
+        display(iframe)
+        return iframe
 
     @staticmethod
-    def display_notebook(url, width=1000, height=600):
+    def display_notebook(url, width=900, height=600):
         from IPython.display import IFrame
         return IFrame(f"{url}", width=width, height=height)
