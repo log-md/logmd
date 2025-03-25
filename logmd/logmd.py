@@ -6,6 +6,7 @@ import time
 import hashlib
 import atexit
 import io 
+import os 
 import ase.io
 from openmm import unit  # type: ignore[import-untyped]
 import random
@@ -14,10 +15,11 @@ from typing import Optional
 import base64
 from tqdm import tqdm
 import zipfile
+from ase import units
 
 from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
-from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url
+from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url, update_pdb_positions
 from logmd.auth import load_token
 
 
@@ -28,6 +30,9 @@ class LogMD:
         project: str = "",
         template: str = "",
         interval: int = 100,
+        pdb: str = "",
+        store_locally: bool = False, # store locally 
+        zip: bool = False # zip when done. 
     ):
         """
         LogMD logs ase.Atoms objects to rscb.ai.
@@ -56,6 +61,14 @@ class LogMD:
         self.interval: int = interval
         self.project: str = project
         self.token: Optional[LogMDToken] = None
+        self.pdb = pdb 
+        self.store_locally = store_locally
+        self.zip = zip
+        self.path = os.getcwd()
+        self.disk_space_warning_shown = False  # Track if warning has been shown
+
+        if self.pdb != "":
+            self.pdb = open(self.pdb, 'r').read()
 
         if template != "":
             template_or_templates = ase.io.read(template)  # for openmm
@@ -93,6 +106,9 @@ class LogMD:
             # pr[collision]~1/16^10=1e-12
             # E[draws to get collision]~sqrt(pr[collision])~1e-5    (birthday paradox)
             # => we have to check...
+            # TODO: 
+            #   [ ] move hash generation to backend.
+            #   [ ] move upload to signed url  
             self.run_id = hashlib.sha256(str(time.time()).encode()).hexdigest()[:10]
             while (
                 httpx.head(f"https://logmd.b-cdn.net/public/{self.run_id}/").status_code
@@ -102,6 +118,9 @@ class LogMD:
                     str(time.time() + random.random()).encode()
                 ).hexdigest()[:10]
             self.url = f"{get_fe_base_url()}/{self.run_id}"
+
+        if self.store_locally:
+            os.makedirs(f"{self.path}/logmd/{self.run_id}/", exist_ok=True)
 
         # Print init message with run id.
         rich.print(f"{LOGMD_PREFIX}Load_time=[blue]{time.time() - t0:.2f}s[/] 🚀")
@@ -130,6 +149,12 @@ class LogMD:
             self.upload_queue.put(None)
         for process in self.upload_processes:
             process.join()
+
+        # Zip and upload local files if requested
+        #if self.store_locally and self.zip:
+        #    #self.zip_and_upload_local_files()
+
+
         rich.print(f"{LOGMD_PREFIX}Url=[blue]{self.url}[/] ✅")
 
     @staticmethod
@@ -264,7 +289,7 @@ class LogMD:
             energy = 0
 
         if dyn is not None:
-            simulation_time, temperature = dyn.get_time(), dyn.temp * eV_to_K
+            simulation_time, temperature = dyn.get_time()/units.fs, dyn.temp * eV_to_K
             data_dict.update(
                 {
                     "simulation_time": f"{simulation_time} [ps]",
@@ -272,10 +297,27 @@ class LogMD:
                 }
             )
 
-        temp_pdb = io.StringIO()
-        ase.io.write(temp_pdb, atoms, format="proteindatabank")
-        atom_string = temp_pdb.getvalue()
-        temp_pdb.close()
+        if self.pdb != "":
+            atom_string = update_pdb_positions(self.pdb, atoms.positions)
+        else: 
+            temp_pdb = io.StringIO()
+            ase.io.write(temp_pdb, atoms, format="proteindatabank")
+            atom_string = temp_pdb.getvalue()
+            temp_pdb.close()
+
+
+        if self.store_locally:
+            try: 
+                free_space = os.statvfs(self.path).f_frsize * os.statvfs(self.path).f_bavail
+                if free_space >= 1000000000:  
+                    with open(f"{self.path}/logmd/{self.run_id}/{self.frame_num}.pdb", "w") as f:
+                        f.write(atom_string)
+                else:
+                    if not self.disk_space_warning_shown:
+                        rich.print(f"{LOGMD_PREFIX}[yellow]Warning: Less than 1GB free space available. Skipping local storage.[/]")
+                        self.disk_space_warning_shown = True
+            except: 
+                pass 
 
         data_dict.update(
             {
@@ -323,42 +365,58 @@ class LogMD:
 
         return 0
 
-    def notebook(self, width=1000, height=600):
-        from IPython.display import display
-        from IPython.display import IFrame
+    def notebook(self, width=900, height=600):
+        from IPython.display import IFrame, display
         iframe = IFrame(f"{self.url}", width=width, height=height)
         display(iframe)
         return iframe
 
     @staticmethod
-    def display_notebook(url, width=1000, height=600):
+    def display_notebook(url, width=900, height=600):
         from IPython.display import IFrame
         return IFrame(f"{url}", width=width, height=height)
 
     @staticmethod
-    def run(dyn, steps=100, notebook=False):
+    def run(dyn, steps=100, key=None):
+        ''' WARNING:  initial trail, assumes orb model.  
+
+        Assumptions:
+        - user runs file we can get code with `inspect.getsource(...)` 
+        - in that file user has naming convenction `orbff = ..` and `calc = ..(orbff)`
+        - user sends a dynamics object from ASE.  
+        '''
+        if key is None: return 
+
         import inspect
         import dill 
 
-        url = "https://alexander-mathiasen--orb-run-md-dev.modal.run"
-        headers = {'Content-Type': 'application/json'}
+        url = "https://alexander-mathiasen--orb-run-md.modal.run"
+        #url = "https://alexander-mathiasen--orb-run-md-dev.modal.run"
         current_file_code = inspect.getsource(inspect.getmodule(inspect.stack()[1].frame))
 
-        dyn.atoms.calc = None # remove calculator, can be 100MB NN. 
+        # remove orbff to skip uploading ~20mb-100mb 
+        orbff = dyn.atoms.calc.model
+        dyn.atoms.calc = None 
+        hash = hashlib.sha256(base64.b64encode(dill.dumps( [p.cpu().numpy() for p in orbff.parameters()]))).hexdigest()
+
         payload = {
             "code": current_file_code,
             "dyn": base64.b64encode(dill.dumps(dyn)).decode('utf-8'),
-            "steps": steps
+            "steps": steps,
+            "hash": hash,
+            "key": key
         }
+        
+        response = requests.post(url, json=payload, stream=True)
 
-        response = requests.post(url, json=payload, headers=headers, verify=False, stream=True)
-        pbar = tqdm(range(steps))
-        for num, line in enumerate(response.iter_lines()):
-            print(line.decode())
+        pbar = None 
+        for num, chunk in enumerate(response.iter_lines()):
             if num == 0: 
-                url = line.decode()
-            if line:
-                pass 
-                #pbar.set_description(f'[logmd] url={url} {line.decode()}')
-                #pbar.update(1)
+                url = chunk.decode()
+                rich.print(f"{LOGMD_PREFIX}Url=[blue][link={url}]{url}[/link][/] 🚀")
+                pbar = tqdm(range(steps))
+            else: 
+                pbar.set_description(chunk.decode())
+                pbar.update(1)
+
         pbar.close()

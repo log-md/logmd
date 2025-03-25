@@ -36,3 +36,29 @@ def get_run_id(num: int) -> str:
         random.sample(NOUNS, 1)[0],
     )
     return f"{adj}-{noun}-{num}"
+
+
+def update_pdb_positions(pdb_string, new_positions):
+    """
+    Replace atomic coordinates in a PDB string while retaining all metadata.
+
+    :param pdb_string: Original PDB file content as a string.
+    :param new_positions: Nx3 NumPy array of new atomic positions.
+    :return: Updated PDB string.
+    """
+    pdb_lines = pdb_string.splitlines()
+    updated_lines = []
+    pos_index = 0
+
+    for line in pdb_lines:
+        if line.startswith("ATOM") or line.startswith("HETATM"):
+            # Format new positions while keeping original formatting
+            x, y, z = new_positions[pos_index]
+            new_coords = f"{x:8.3f}{y:8.3f}{z:8.3f}"
+            updated_line = f"{line[:30]}{new_coords}{line[54:]}"
+            updated_lines.append(updated_line)
+            pos_index += 1
+        else:
+            updated_lines.append(line)
+
+    return "\n".join(updated_lines)
