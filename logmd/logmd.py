@@ -1,6 +1,7 @@
 import httpx
 import multiprocessing
 from multiprocessing import Queue
+import requests
 import time
 import hashlib
 import atexit
@@ -323,10 +324,41 @@ class LogMD:
         return 0
 
     def notebook(self, width=1000, height=600):
+        from IPython.display import display
         from IPython.display import IFrame
-        return IFrame(f"{self.url}", width=width, height=height)
+        iframe = IFrame(f"{self.url}", width=width, height=height)
+        display(iframe)
+        return iframe
 
     @staticmethod
     def display_notebook(url, width=1000, height=600):
         from IPython.display import IFrame
         return IFrame(f"{url}", width=width, height=height)
+
+    @staticmethod
+    def run(dyn, steps=100, notebook=False):
+        import inspect
+        import dill 
+
+        url = "https://alexander-mathiasen--orb-run-md-dev.modal.run"
+        headers = {'Content-Type': 'application/json'}
+        current_file_code = inspect.getsource(inspect.getmodule(inspect.stack()[1].frame))
+
+        dyn.atoms.calc = None # remove calculator, can be 100MB NN. 
+        payload = {
+            "code": current_file_code,
+            "dyn": base64.b64encode(dill.dumps(dyn)).decode('utf-8'),
+            "steps": steps
+        }
+
+        response = requests.post(url, json=payload, headers=headers, verify=False, stream=True)
+        pbar = tqdm(range(steps))
+        for num, line in enumerate(response.iter_lines()):
+            print(line.decode())
+            if num == 0: 
+                url = line.decode()
+            if line:
+                pass 
+                #pbar.set_description(f'[logmd] url={url} {line.decode()}')
+                #pbar.update(1)
+        pbar.close()
