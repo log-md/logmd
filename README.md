@@ -15,7 +15,7 @@
 pip install logmd
 ```
 
-Try in this <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a> or `logmd upload 1crn.pdb` from the terminal.
+Try  <a href="https://colab.research.google.com/drive/12adhXXF1MQIzh_vEwKX9r_iF6jV-CNHE#scrollTo=N2_uubn_2qGM" target="_blank" rel="noopener noreferrer"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>.
 
 We support [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/) and [OpenMM](https://github.com/openmm/openmm) - [vote here](https://github.com/log-md/logmd/issues/1) for other backends.
 
