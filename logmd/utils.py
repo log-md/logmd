@@ -62,3 +62,28 @@ def update_pdb_positions(pdb_string, new_positions):
             updated_lines.append(line)
 
     return "\n".join(updated_lines)
+
+
+def fix_pdb_bfactor_string(pdb_content):
+    # scale bfactor from [0,1] to [0,100]
+    vals = []
+    output_lines = []
+    for line in pdb_content.splitlines():
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+            prefix = line[:60]
+            bfactor_str = line[60:66].strip()
+            suffix = line[66:]
+            bfactor = float(bfactor_str) 
+            if bfactor <= 1.0: bfactor = int(bfactor * 100)
+            vals.append(bfactor)
+            new_bfactor_str = f"{bfactor}".rjust(6)[:6]
+            output_lines.append(f"{prefix}{new_bfactor_str}{suffix}")
+        else:
+            output_lines.append(line)
+    return '\n'.join(output_lines), vals
+
+def clean_for_ASE(pdb):
+    # remove additional lines, helps ASE read. 
+    lines = pdb.split('\n')
+    lines = [line for line in lines if line.startswith('ATOM') or line.startswith('HETATM')]
+    return '\n'.join(lines)

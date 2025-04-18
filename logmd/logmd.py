@@ -1,6 +1,7 @@
 import httpx
 import multiprocessing
 from multiprocessing import Queue
+import time 
 import requests
 import time
 import hashlib
@@ -19,7 +20,7 @@ from ase import units
 
 from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
-from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url, update_pdb_positions
+from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url, update_pdb_positions, fix_pdb_bfactor_string, clean_for_ASE
 from logmd.auth import load_token
 
 
@@ -271,8 +272,22 @@ class LogMD:
 
         return url
 
+    @staticmethod
+    def pytraj(traj, fun=None, display_notebook=False):
+        if not traj.top.filename.endswith('.pdb'):
+            print(f"Only support `topology.pdb` not `{traj.top.filename}`")
+            print("Please open an issue at https://github.com/log-md/logmd/issues")
+        logmd = LogMD()
+        if display_notebook: logmd.notebook()
+        atoms = ase.io.read(traj.top.filename)
+        for frame in traj: 
+            atoms.set_positions(frame.xyz)
+            logmd(atoms, data_dict=fun(atoms))
+            time.sleep(.1)
+
+
     # for ase
-    def __call__(self, atoms, dyn=None, data_dict=None):
+    def __call__(self, atoms, dyn=None, data_dict=None, calc=False):
         """
         Method ASE calls:
         logmd = LogMD()
@@ -280,31 +295,39 @@ class LogMD:
         """
         if data_dict is None:
             data_dict = {}
-
         self.frame_num += 1
+        energy = 0 
 
-        if atoms.calc is not None:
-            energy = float(atoms.get_potential_energy())
-        else:
-            energy = 0
-
-        if dyn is not None:
-            simulation_time, temperature = dyn.get_time()/units.fs, dyn.temp * eV_to_K
-            data_dict.update(
-                {
-                    "simulation_time": f"{simulation_time} [ps]",
-                    "temperature": f"{temperature} [K]",
-                }
-            )
-
-        if self.pdb != "":
-            atom_string = update_pdb_positions(self.pdb, atoms.positions)
+        if type(atoms) == str: 
+            atom_string, vals = fix_pdb_bfactor_string(atoms) 
+            data_dict.update( {
+                "confidence": f"{sum(vals)/len(vals)} [0-100]",
+            })
+            if calc:
+                # read atoms from pdb_string, add calc and compute enregy 
+                atoms = ase.io.read(io.StringIO(clean_for_ASE(atom_string)), format='proteindatabank')
+                atoms.calc = calc
+                energy = float(atoms.get_potential_energy())
+        
         else: 
-            temp_pdb = io.StringIO()
-            ase.io.write(temp_pdb, atoms, format="proteindatabank")
-            atom_string = temp_pdb.getvalue()
-            temp_pdb.close()
+            if atoms.calc is not None: energy = float(atoms.get_potential_energy())
 
+            if dyn is not None:
+                simulation_time, temperature = dyn.get_time()/units.fs, dyn.temp * eV_to_K
+                data_dict.update(
+                    {
+                        "simulation_time": f"{simulation_time} [ps]",
+                        "temperature": f"{temperature} [K]",
+                    }
+                )
+
+            if self.pdb != "":
+                atom_string = update_pdb_positions(self.pdb, atoms.positions)
+            else: 
+                temp_pdb = io.StringIO()
+                ase.io.write(temp_pdb, atoms, format="proteindatabank")
+                atom_string = temp_pdb.getvalue()
+                temp_pdb.close()
 
         if self.store_locally:
             try: 
@@ -362,12 +385,13 @@ class LogMD:
             rich.print(
                 f"{LOGMD_PREFIX}[red]Error while listing project files: `[dim]{str(e)}[/]`"
             )
-
         return 0
 
-    def notebook(self, width=900, height=600):
+    def notebook(self, width=900, height=600, label=None, suffix=''):
         from IPython.display import IFrame, display
-        iframe = IFrame(f"{self.url}", width=width, height=height)
+        if label is not None: suffix = f"&label={label}"
+        rich.print(f"{LOGMD_PREFIX}Url=[blue][link={self.url}?{suffix}]{self.url}?{suffix}[/link][/] (embedded) 🚀")
+        iframe = IFrame(f"{self.url}?{suffix}", width=width, height=height)
         display(iframe)
         return iframe
 

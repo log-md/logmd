@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "logmd"
-version = "0.1.35"
+version = "0.1.44"
 description = "Log MD trajectories. "
 authors = [
   "Alexander Mathiasen <alexander.mathiasen@gmail.com>",
@@ -17,6 +17,7 @@ tqdm = "^4.67.1"
 openmm = "^8.2.0"
 typer = "^0.15.2"
 pydantic = "^2.10.6"
+requests = "^2.31.0"
 
 
 [tool.poetry.group.dev.dependencies]
