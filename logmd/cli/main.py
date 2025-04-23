@@ -23,10 +23,41 @@ def upload_file(
     project: str = typer.Option(
         default="", help="The project to upload to [requires login]."
     ),
+    topology: Path = typer.Option(default=None, help="The path to the topology file to upload."),
 ):
     """
     Upload a file to LogMD.
     """
+    if topology is not None:
+        # assume desmond format. 
+        try:
+            from pymol import cmd 
+        except:
+            print("Pymol not installed, it's required for Desmond files. ")
+            print("Install with `conda install -c schrodinger pymol .")
+            exit()
+
+        # Redirect stdout temporarily
+        import contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            # Load the structure and trajectory
+            cmd.load(topology, "m")
+            cmd.load_traj(file_path, "m")
+
+        n_frames = cmd.count_frames("m")
+        print(f"Total number of frames: {n_frames}")
+        logmd = LogMD()
+
+        from tqdm import tqdm
+        #for frame in tqdm(range(1, n_frames + 1)):
+        for frame in tqdm(range(1, n_frames + 1)):
+            cmd.frame(frame)
+            cmd.save('.tmp.pdb', "m", state=frame, format="pdb")
+            pdb = open('.tmp.pdb').read()
+            logmd(pdb)
+            time.sleep(0.1)
+        exit()
+        
     logmd_obj = LogMD(project=project)
     content = file_path.read_text()
     model_count = content.count("\nMODEL")
@@ -55,11 +86,74 @@ def upload_file(
 
 
 @app.command(name="watch")
-def watch_from_terminal(file_path: Path):
+def watch_from_terminal(file_path: Path, topology: Path = None, interval: int = 1):
     """
     Watch a file and upload it to LogMD when it changes.
     """
     import hashlib
+
+    if topology is not None:
+        hash = ""
+        #logmd_obj = LogMD()
+        # assume desmond format. 
+        try:
+            from pymol import cmd 
+        except:
+            print("Pymol not installed, it's required for Desmond files. ")
+            print("Install with `conda install -c schrodinger pymol .")
+            exit()
+
+        import contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            cmd.load(topology, "m")
+            cmd.load_traj(file_path, "m")#, start=0, stop=700)
+        n_frames = cmd.count_frames("m")
+        print(f"Found {n_frames} ready to upload. ")
+        print('looking for more frames...')
+
+        logmd = LogMD()
+        for frame in tqdm(range(1, n_frames + 1, interval)):
+            cmd.frame(frame)
+            cmd.save('.tmp.pdb', "m", state=frame, format="pdb")
+            pdb = open('.tmp.pdb').read()
+            logmd(pdb)
+            time.sleep(0.1)
+
+        import os 
+        while True:
+            '''with open(os.devnull, 'w') as devnull:
+                old_stdout = sys.stdout
+                old_stderr = sys.stderr
+                sys.stdout = devnull
+                sys.stderr = devnull
+                try:
+                    # Load the structure and trajectory
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        cmd.load(topology, "m")
+                        cmd.load_traj(file_path, "m", start=n_frames)
+                finally:
+                    sys.stdout = old_stdout
+                    sys.stderr = old_stderr'''
+
+            cmd.load(topology, "m")
+            cmd.load_traj(file_path, "m", start=n_frames)
+
+            new_n_frames = cmd.count_frames("m")
+            print(f"Total {n_frames} new {new_n_frames-1} url={logmd.url}")
+            if new_n_frames > 1: 
+                print(f"Found {new_n_frames-1} new frames to upload. ")
+                for frame in tqdm(range(1, new_n_frames + 1, interval)):
+                    cmd.frame(frame)
+                    cmd.save('.tmp.pdb', "m", state=frame, format="pdb")
+                    pdb = open('.tmp.pdb').read()
+                    print(len(pdb))
+                    logmd(pdb)
+                    time.sleep(0.1)
+                n_frames += new_n_frames - 1
+
+            time.sleep(2.0)
+
+        exit()
 
     hash = ""
     logmd_obj = LogMD()

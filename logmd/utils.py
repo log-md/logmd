@@ -8,9 +8,14 @@ FE_PROD = "https://rcsb.ai"
 BE_DEV = "https://alexander-mathiasen--logmd-upload-frame-dev.modal.run"
 BE_PROD = "https://alexander-mathiasen--logmd-upload-frame.modal.run"
 
+BE_DEV_BCIF = "https://alexander-mathiasen--logmd-upload-frame-bcif-dev.modal.run"
+BE_PROD_BCIF = "https://alexander-mathiasen--logmd-upload-frame-bcif.modal.run"
+
 
 def is_dev():
-    return os.environ.get("LOGMD_DEV", "false").lower() == "true"
+    dev = os.environ.get("LOGMD_DEV", "false").lower() == "true"
+    print(f"LOGMD_DEV: {dev}")
+    return dev
 
 
 def get_fe_base_url():
@@ -19,6 +24,9 @@ def get_fe_base_url():
 
 def get_upload_url():
     return BE_PROD if not is_dev() else BE_DEV
+
+def get_upload_url_bcif():
+    return BE_PROD_BCIF if not is_dev() else BE_DEV_BCIF
 
 
 def get_run_id(num: int) -> str:
@@ -87,3 +95,52 @@ def clean_for_ASE(pdb):
     lines = pdb.split('\n')
     lines = [line for line in lines if line.startswith('ATOM') or line.startswith('HETATM')]
     return '\n'.join(lines)
+
+import gemmi
+from mmcif.io.IoAdapterPy import IoAdapterPy
+from mmcif.api.DictionaryApi import DictionaryApi
+from mmcif.io.BinaryCifWriter import BinaryCifWriter
+from pathlib import Path
+import gzip 
+import requests
+import shutil
+from tqdm import tqdm 
+
+def pdb_to_cif(pdb_path, cif_path):
+    st = gemmi.read_pdb(pdb_path)
+    doc = st.make_mmcif_document()
+    doc.write_file(cif_path)
+
+    # these lines break molstar. 
+    with open(cif_path, "r") as f:
+        content = f.read()
+        loops = content.split('loop_')
+        loops = loops[0] + 'loop_'+loops[-1]
+
+    with open(cif_path, "w") as f:
+        f.write(loops)
+
+def cif_to_bcif(cif_path, bcif_path):
+    mmcif_dic_path = Path.home() / 'mmcif_pdbx_v5_next.dic'
+    if not mmcif_dic_path.exists():
+        #url = 'https://mmcif.wwpdb.org/dictionaries/ascii/mmcif_pdbx_v5_next.dic.gz'# slow 20kb/s
+        url = 'https://logmd.b-cdn.net/public/mmcif_pdbx_v5_next.dic.gz' # fast 600kb/s
+
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            total = int(r.headers.get('content-length', 0))
+            total_kb = total // 1024
+            buf = io.BytesIO()
+            bar_fmt = '{l_bar}{bar}| {n_fmt}KB/{total_fmt}KB [{rate_fmt}]'
+            with tqdm(total=total_kb, unit='KB', bar_format=bar_fmt) as pbar:
+                for chunk in r.iter_content(chunk_size=8192):
+                    buf.write(chunk)
+                    pbar.update(len(chunk) // 1024)
+            buf.seek(0)
+            with gzip.open(buf, 'rb') as f_in, open(mmcif_dic_path, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+    io = IoAdapterPy(raiseExceptions=True)
+    dApi = DictionaryApi(io.readFile(inputFilePath=mmcif_dic_path), consolidate=True)
+    containers = io.readFile(inputFilePath=cif_path) 
+    BinaryCifWriter(dApi).serialize(bcif_path, containers)

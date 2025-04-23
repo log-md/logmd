@@ -20,9 +20,8 @@ from ase import units
 
 from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
-from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url, update_pdb_positions, fix_pdb_bfactor_string, clean_for_ASE
+from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url_bcif, update_pdb_positions, fix_pdb_bfactor_string, clean_for_ASE, pdb_to_cif, cif_to_bcif
 from logmd.auth import load_token
-
 
 class LogMD:
     def __init__(
@@ -171,17 +170,26 @@ class LogMD:
                 break
             atom_string, frame_num, run_id, data_dict = item
 
-            url = get_upload_url()
+            open('tmp.pdb', 'w').write(atom_string)
+            pdb_to_cif('tmp.pdb', 'tmp.cif')
+            cif_to_bcif('tmp.cif', 'tmp.bcif')
+            bcif_data = open('tmp.bcif', 'rb').read()
+            url = get_upload_url_bcif()
+            
+            # Create form data with binary file and JSON metadata
+            files = {'file': ('frame.bcif', bcif_data, 'application/octet-stream')}
+            import json
             data = {
                 "user_id": "public" if token is None else token.email,
                 "run_id": run_id,
                 "frame_num": str(frame_num),
-                "file_contents": atom_string,
                 "token": None if token is None else token.token,
                 "project": project,
-                "data_dict": data_dict,
+                "data_dict": json.dumps(data_dict),
             }
-            response = client.post(url, json=data)
+            
+            response = client.post(url, data=data, files=files)
+            #print(response)
             status_queue.put((frame_num, response.status_code))
         client.close()
 
@@ -285,7 +293,6 @@ class LogMD:
             logmd(atoms, data_dict=fun(atoms))
             time.sleep(.1)
 
-
     # for ase
     def __call__(self, atoms, dyn=None, data_dict=None, calc=False):
         """
@@ -300,9 +307,13 @@ class LogMD:
 
         if type(atoms) == str: 
             atom_string, vals = fix_pdb_bfactor_string(atoms) 
-            data_dict.update( {
-                "confidence": f"{sum(vals)/len(vals)} [0-100]",
-            })
+            if data_dict is not None:
+                try: 
+                    data_dict.update( {
+                        "confidence": f"{sum(vals)/len(vals)} [0-100]",
+                    })
+                except: 
+                    pass 
             if calc:
                 # read atoms from pdb_string, add calc and compute enregy 
                 atoms = ase.io.read(io.StringIO(clean_for_ASE(atom_string)), format='proteindatabank')
