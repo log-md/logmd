@@ -20,7 +20,8 @@ from ase import units
 
 from logmd.constants import LOGMD_PREFIX, eV_to_K
 from logmd.data_models import LogMDToken
-from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url_bcif, update_pdb_positions, fix_pdb_bfactor_string, clean_for_ASE, pdb_to_cif, cif_to_bcif
+from logmd.utils import is_dev, get_fe_base_url, get_run_id, get_upload_url_bcif, \
+    update_pdb_positions, fix_pdb_bfactor_string, clean_for_ASE, pdb_to_cif, cif_to_bcif, arr_to_xbit
 from logmd.auth import load_token
 
 class LogMD:
@@ -168,29 +169,69 @@ class LogMD:
             item = upload_queue.get()
             if item is None:
                 break
-            atom_string, frame_num, run_id, data_dict = item
+            atom_string, frame_num, run_id, data_dict, format = item
 
-            open('tmp.pdb', 'w').write(atom_string)
-            pdb_to_cif('tmp.pdb', 'tmp.cif')
-            cif_to_bcif('tmp.cif', 'tmp.bcif')
-            bcif_data = open('tmp.bcif', 'rb').read()
+            t = time.time()
+
+            import os 
+            data_dict['__format__'] = format
             url = get_upload_url_bcif()
+            if format == 'bcif': 
+                os.makedirs(f'logmd/', exist_ok=True)
+                os.makedirs(f'logmd/tmp/', exist_ok=True)
+
+                open(f'logmd/tmp/tmp_{t}.pdb', 'w').write(atom_string)
+                pdb_to_cif(f'logmd/tmp/tmp_{t}.pdb', f'logmd/tmp/tmp_{t}.cif')
+                cif_to_bcif(f'logmd/tmp/tmp_{t}.cif', f'logmd/tmp/tmp_{t}.bcif')
+                bcif_data = open(f'logmd/tmp/tmp_{t}.bcif', 'rb').read()
+                os.remove(f'logmd/tmp/tmp_{t}.pdb')
+                os.remove(f'logmd/tmp/tmp_{t}.cif')
+                os.remove(f'logmd/tmp/tmp_{t}.bcif')
+                print('bcif', frame_num)
             
-            # Create form data with binary file and JSON metadata
-            files = {'file': ('frame.bcif', bcif_data, 'application/octet-stream')}
-            import json
-            data = {
-                "user_id": "public" if token is None else token.email,
-                "run_id": run_id,
-                "frame_num": str(frame_num),
-                "token": None if token is None else token.token,
-                "project": project,
-                "data_dict": json.dumps(data_dict),
-            }
+                # Create form data with binary file and JSON metadata
+                files = {'file': ('frame.bcif', bcif_data, 'application/octet-stream')}
+                import json
+                data = {
+                    "user_id": "public" if token is None else token.email,
+                    "run_id": run_id,
+                    "frame_num": str(frame_num),
+                    "token": None if token is None else token.token,
+                    "project": project,
+                    "data_dict": json.dumps(data_dict),
+                }
+                print('bcif')
+                response = client.post(url, data=data, files=files)
+                status_queue.put((frame_num, response.status_code))
+
+            elif format == 'xbit': 
+                os.makedirs(f'logmd/', exist_ok=True)
+                os.makedirs(f'logmd/tmp/', exist_ok=True)
+
+                import pdbarray as pa
+                arr = pa.array(atom_string)
+                bit, min = arr_to_xbit(arr.numpy(), f'logmd/tmp/tmp_{t}.xbit')
+                xbit_data = open(f'logmd/tmp/tmp_{t}.xbit', 'rb').read()
+                os.remove(f'logmd/tmp/tmp_{t}.xbit')
+                data_dict['__min__'] = min
+                data_dict['__bit__'] = bit
             
-            response = client.post(url, data=data, files=files)
-            #print(response)
-            status_queue.put((frame_num, response.status_code))
+                # Create form data with binary file and JSON metadata
+                files = {'file': ('frame.xbit', xbit_data, 'application/octet-stream')}
+                print('xbit')
+                import json
+                data = {
+                    "user_id": "public" if token is None else token.email,
+                    "run_id": run_id,
+                    "frame_num": str(frame_num),
+                    "token": None if token is None else token.token,
+                    "project": project,
+                    "data_dict": json.dumps(data_dict),
+                }
+                
+                response = client.post(url, data=data, files=files)
+                status_queue.put((frame_num, response.status_code))
+                
         client.close()
 
     # for openmm
@@ -341,6 +382,7 @@ class LogMD:
                 temp_pdb.close()
 
         if self.store_locally:
+            # also do this with bcif/xbit. 
             try: 
                 free_space = os.statvfs(self.path).f_frsize * os.statvfs(self.path).f_bavail
                 if free_space >= 1000000000:  
@@ -358,7 +400,14 @@ class LogMD:
                 "energy": f"{energy} [eV]",
             }
         )
-        self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict))
+        if self.frame_num == 1: format = 'bcif'
+        else: 
+            different = False  
+            # TODO [ ] check if different to the last pdbfile. 
+            # i.e., if we logging a lot of different pdbs, do all in bcif. 
+            # if we do the same pdb and just need to store the atom xyz, do xbit.
+            if not different: format = 'xbit'
+        self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict, format))
 
     def num_files(self) -> int:
         """Returns the number of files in the current project."""

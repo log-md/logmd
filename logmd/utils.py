@@ -130,6 +130,7 @@ def cif_to_bcif(cif_path, bcif_path):
             r.raise_for_status()
             total = int(r.headers.get('content-length', 0))
             total_kb = total // 1024
+            import io 
             buf = io.BytesIO()
             bar_fmt = '{l_bar}{bar}| {n_fmt}KB/{total_fmt}KB [{rate_fmt}]'
             with tqdm(total=total_kb, unit='KB', bar_format=bar_fmt) as pbar:
@@ -144,3 +145,20 @@ def cif_to_bcif(cif_path, bcif_path):
     dApi = DictionaryApi(io.readFile(inputFilePath=mmcif_dic_path), consolidate=True)
     containers = io.readFile(inputFilePath=cif_path) 
     BinaryCifWriter(dApi).serialize(bcif_path, containers)
+
+
+import numpy as np 
+from bitarray import bitarray
+def arr_to_xbit(arr, filename):
+    # arr:  interpreted as xyz array with [A] 
+    # scales to 0.001 accuracy in uint and then saves with minimal number of bits. 
+    a = (1000*arr).astype(np.int64).reshape(-1) 
+    min = int(a.min())
+    a = a - min
+    bit = int(np.log2(a.max())+1) 
+    c = np.vectorize(lambda x: np.binary_repr(x, width=bit))(a)
+    bits = bitarray()
+    bits.extend(''.join(c))
+    with open(filename, 'wb') as f:
+        bits.tofile(f)
+    return bit, min
