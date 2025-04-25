@@ -14,7 +14,6 @@ BE_PROD_BCIF = "https://alexander-mathiasen--logmd-upload-frame-bcif.modal.run"
 
 def is_dev():
     dev = os.environ.get("LOGMD_DEV", "false").lower() == "true"
-    print(f"LOGMD_DEV: {dev}")
     return dev
 
 
@@ -160,5 +159,6 @@ def arr_to_xbit(arr, filename):
     bits = bitarray()
     bits.extend(''.join(c))
     with open(filename, 'wb') as f:
+        f.write(bit.to_bytes(1, byteorder='little'))  # Store bit as 1 byte
+        f.write(min.to_bytes(4, byteorder='little', signed=True))  # Store min as 4 bytes (int32)
         bits.tofile(f)
-    return bit, min

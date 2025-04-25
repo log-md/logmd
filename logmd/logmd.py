@@ -3,6 +3,7 @@ import multiprocessing
 from multiprocessing import Queue
 import time 
 import requests
+import json
 import time
 import hashlib
 import atexit
@@ -174,7 +175,6 @@ class LogMD:
             t = time.time()
 
             import os 
-            data_dict['__format__'] = format
             url = get_upload_url_bcif()
             if format == 'bcif': 
                 os.makedirs(f'logmd/', exist_ok=True)
@@ -187,11 +187,8 @@ class LogMD:
                 os.remove(f'logmd/tmp/tmp_{t}.pdb')
                 os.remove(f'logmd/tmp/tmp_{t}.cif')
                 os.remove(f'logmd/tmp/tmp_{t}.bcif')
-                print('bcif', frame_num)
             
                 # Create form data with binary file and JSON metadata
-                files = {'file': ('frame.bcif', bcif_data, 'application/octet-stream')}
-                import json
                 data = {
                     "user_id": "public" if token is None else token.email,
                     "run_id": run_id,
@@ -199,8 +196,11 @@ class LogMD:
                     "token": None if token is None else token.token,
                     "project": project,
                     "data_dict": json.dumps(data_dict),
+                    "format": "bcif",
                 }
-                print('bcif')
+                files = {'file': ('frame.bcif', bcif_data, 'application/octet-stream')}
+
+                url = 'https://logmdsignupload-it7oy.bunny.run/'
                 response = client.post(url, data=data, files=files)
                 status_queue.put((frame_num, response.status_code))
 
@@ -210,16 +210,13 @@ class LogMD:
 
                 import pdbarray as pa
                 arr = pa.array(atom_string)
-                bit, min = arr_to_xbit(arr.numpy(), f'logmd/tmp/tmp_{t}.xbit')
+                arr_to_xbit(arr.numpy(), f'logmd/tmp/tmp_{t}.xbit')
                 xbit_data = open(f'logmd/tmp/tmp_{t}.xbit', 'rb').read()
-                os.remove(f'logmd/tmp/tmp_{t}.xbit')
-                data_dict['__min__'] = min
-                data_dict['__bit__'] = bit
+                #os.remove(f'logmd/tmp/tmp_{t}.xbit')
             
                 # Create form data with binary file and JSON metadata
                 files = {'file': ('frame.xbit', xbit_data, 'application/octet-stream')}
-                print('xbit')
-                import json
+
                 data = {
                     "user_id": "public" if token is None else token.email,
                     "run_id": run_id,
@@ -227,8 +224,10 @@ class LogMD:
                     "token": None if token is None else token.token,
                     "project": project,
                     "data_dict": json.dumps(data_dict),
+                    "format": "xbit",
                 }
-                
+
+                url = 'https://logmdsignupload-it7oy.bunny.run/'
                 response = client.post(url, data=data, files=files)
                 status_queue.put((frame_num, response.status_code))
                 
