@@ -148,7 +148,7 @@ def cif_to_bcif(cif_path, bcif_path):
 
 import numpy as np 
 from bitarray import bitarray
-def arr_to_xbit(arr, filename):
+def arr_to_xbit(arr, filename, version=0):
     # arr:  interpreted as xyz array with [A] 
     # scales to 0.001 accuracy in uint and then saves with minimal number of bits. 
     a = (1000*arr).astype(np.int64).reshape(-1) 
@@ -161,4 +161,5 @@ def arr_to_xbit(arr, filename):
     with open(filename, 'wb') as f:
         f.write(bit.to_bytes(1, byteorder='little'))  # Store bit as 1 byte
         f.write(min.to_bytes(4, byteorder='little', signed=True))  # Store min as 4 bytes (int32)
+        f.write(version.to_bytes(1, byteorder='little'))  # Store version as 1 bytes (int32)
         bits.tofile(f)
