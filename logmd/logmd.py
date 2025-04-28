@@ -1,6 +1,7 @@
 import httpx
 import multiprocessing
 from multiprocessing import Queue
+from typing import Union
 import time 
 import requests
 import json
@@ -170,66 +171,51 @@ class LogMD:
             item = upload_queue.get()
             if item is None:
                 break
-            atom_string, frame_num, run_id, data_dict, format = item
+            atom_string, frame_num, run_id, data_dict, input_format, store_format = item
 
             t = time.time()
 
             import os 
             url = get_upload_url_bcif()
-            if format == 'bcif': 
-                os.makedirs(f'logmd/', exist_ok=True)
-                os.makedirs(f'logmd/tmp/', exist_ok=True)
+            os.makedirs(f'logmd/', exist_ok=True)
+            os.makedirs(f'logmd/tmp/', exist_ok=True)
 
-                open(f'logmd/tmp/tmp_{t}.pdb', 'w').write(atom_string)
-                pdb_to_cif(f'logmd/tmp/tmp_{t}.pdb', f'logmd/tmp/tmp_{t}.cif')
+            data = {
+                    "user_id": "public" if token is None else token.email,
+                    "run_id": run_id,
+                    "frame_num": str(frame_num),
+                    "token": None if token is None else token.token,
+                    "project": project,
+                    "data_dict": json.dumps(data_dict),
+            }
+
+            if store_format == 'bcif': 
+                if input_format == 'pdb': 
+                    open(f'logmd/tmp/tmp_{t}.pdb', 'w').write(atom_string)
+                    pdb_to_cif(f'logmd/tmp/tmp_{t}.pdb', f'logmd/tmp/tmp_{t}.cif')
+                elif input_format == 'cif': 
+                    open(f'logmd/tmp/tmp_{t}.cif', 'w').write(atom_string)
                 cif_to_bcif(f'logmd/tmp/tmp_{t}.cif', f'logmd/tmp/tmp_{t}.bcif')
                 bcif_data = open(f'logmd/tmp/tmp_{t}.bcif', 'rb').read()
                 os.remove(f'logmd/tmp/tmp_{t}.pdb')
                 os.remove(f'logmd/tmp/tmp_{t}.cif')
                 os.remove(f'logmd/tmp/tmp_{t}.bcif')
-            
-                # Create form data with binary file and JSON metadata
-                data = {
-                    "user_id": "public" if token is None else token.email,
-                    "run_id": run_id,
-                    "frame_num": str(frame_num),
-                    "token": None if token is None else token.token,
-                    "project": project,
-                    "data_dict": json.dumps(data_dict),
-                    "format": "bcif",
-                }
                 files = {'file': ('frame.bcif', bcif_data, 'application/octet-stream')}
+                data['format'] = 'bcif'
 
-                url = 'https://logmdsignupload-it7oy.bunny.run/'
-                response = client.post(url, data=data, files=files)
-                status_queue.put((frame_num, response.status_code))
-
-            elif format == 'xbit': 
-                os.makedirs(f'logmd/', exist_ok=True)
-                os.makedirs(f'logmd/tmp/', exist_ok=True)
-
+            elif store_format == 'xbit': 
                 import pdbarray as pa
-                arr = pa.array(atom_string)
+                arr = pa.array(atom_string) # can this handle .cif?
                 arr_to_xbit(arr.numpy(), f'logmd/tmp/tmp_{t}.xbit')
+                os.remove(f'logmd/tmp/tmp_{t}.xbit')
                 xbit_data = open(f'logmd/tmp/tmp_{t}.xbit', 'rb').read()
-                #os.remove(f'logmd/tmp/tmp_{t}.xbit')
-            
-                # Create form data with binary file and JSON metadata
                 files = {'file': ('frame.xbit', xbit_data, 'application/octet-stream')}
-
-                data = {
-                    "user_id": "public" if token is None else token.email,
-                    "run_id": run_id,
-                    "frame_num": str(frame_num),
-                    "token": None if token is None else token.token,
-                    "project": project,
-                    "data_dict": json.dumps(data_dict),
-                    "format": "xbit",
-                }
-
-                url = 'https://logmdsignupload-it7oy.bunny.run/'
-                response = client.post(url, data=data, files=files)
-                status_queue.put((frame_num, response.status_code))
+                data['format'] = 'xbit'
+            
+            # Create form data with binary file and JSON metadata
+            url = 'https://logmdsignupload-it7oy.bunny.run/'
+            response = client.post(url, data=data, files=files)
+            status_queue.put((frame_num, response.status_code))
                 
         client.close()
 
@@ -333,32 +319,33 @@ class LogMD:
             logmd(atoms, data_dict=fun(atoms))
             time.sleep(.1)
 
-    # for ase
-    def __call__(self, atoms, dyn=None, data_dict=None, calc=False):
+    def __call__(self, atoms: Union[str, ase.Atoms], dyn=None, data_dict=None, calc=False, input_format=None):
         """
         Method ASE calls:
         logmd = LogMD()
         dyn.attach(logmd)
         """
-        if data_dict is None:
-            data_dict = {}
+        if data_dict is None: data_dict = {}
         self.frame_num += 1
         energy = 0 
 
         if type(atoms) == str: 
-            atom_string, vals = fix_pdb_bfactor_string(atoms) 
-            if data_dict is not None:
-                try: 
-                    data_dict.update( {
-                        "confidence": f"{sum(vals)/len(vals)} [0-100]",
-                    })
-                except: 
-                    pass 
-            if calc:
-                # read atoms from pdb_string, add calc and compute enregy 
-                atoms = ase.io.read(io.StringIO(clean_for_ASE(atom_string)), format='proteindatabank')
-                atoms.calc = calc
-                energy = float(atoms.get_potential_energy())
+            if input_format == 'cif': 
+                atom_string = atoms 
+            else: 
+                atom_string, vals = fix_pdb_bfactor_string(atoms) 
+                if data_dict is not None:
+                    try: 
+                        data_dict.update( {
+                            "confidence": f"{sum(vals)/len(vals)} [0-100]",
+                        })
+                    except: 
+                        pass 
+                if calc:# TODO: remove this, shouldn't be our responsibility. fix in rcsb.ai/rfdiffusion 
+                    # read atoms from pdb_string, add calc and compute enregy 
+                    atoms = ase.io.read(io.StringIO(clean_for_ASE(atom_string)), format='proteindatabank')
+                    atoms.calc = calc
+                    energy = float(atoms.get_potential_energy())
         
         else: 
             if atoms.calc is not None: energy = float(atoms.get_potential_energy())
@@ -399,14 +386,14 @@ class LogMD:
                 "energy": f"{energy} [eV]",
             }
         )
-        if self.frame_num == 1: format = 'bcif'
+        if self.frame_num == 1: store_format = 'bcif'
         else: 
             different = False  
             # TODO [ ] check if different to the last pdbfile. 
             # i.e., if we logging a lot of different pdbs, do all in bcif. 
             # if we do the same pdb and just need to store the atom xyz, do xbit.
-            if not different: format = 'xbit'
-        self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict, format))
+            if not different: store_format = 'xbit'
+        self.upload_queue.put((atom_string, self.frame_num, self.run_id, data_dict, input_format, store_format))
 
     def num_files(self) -> int:
         """Returns the number of files in the current project."""

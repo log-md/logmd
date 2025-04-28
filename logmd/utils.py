@@ -161,5 +161,4 @@ def arr_to_xbit(arr, filename, version=0):
     with open(filename, 'wb') as f:
         f.write(bit.to_bytes(1, byteorder='little'))  # Store bit as 1 byte
         f.write(min.to_bytes(4, byteorder='little', signed=True))  # Store min as 4 bytes (int32)
-        f.write(version.to_bytes(1, byteorder='little'))  # Store version as 1 bytes (int32)
         bits.tofile(f)
